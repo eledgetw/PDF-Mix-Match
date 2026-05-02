@@ -172,6 +172,17 @@
           </button>
 
           <span class="text-sm text-gray-300">|</span>
+
+          <!-- 黑文白文按鈕 -->
+          <button
+            id="docEnhanceBtn"
+            disabled
+            class="text-sm font-bold text-indigo-600 hover:text-indigo-800 disabled:opacity-40 disabled:cursor-not-allowed px-2 py-1 transition-opacity"
+          >
+            <i class="fa-solid fa-wand-magic-sparkles mr-1"></i> 黑文白文
+          </button>
+
+          <span class="text-sm text-gray-300">|</span>
           <span
             id="selectionCount"
             class="text-sm font-bold text-red-600 bg-red-50 px-3 py-1 rounded-full"
@@ -280,6 +291,7 @@
         const exportPngBtn = document.getElementById("exportPngBtn");
         const exportMdBtn = document.getElementById("exportMdBtn");
         const rotateBtn = document.getElementById("rotateBtn");
+        const docEnhanceBtn = document.getElementById("docEnhanceBtn");
 
         // 新增範圍選擇的 DOM 元素
         const rangeStartInput = document.getElementById("rangeStart");
@@ -305,6 +317,7 @@
           .addEventListener("click", () => toggleAll(false));
 
         rotateBtn.addEventListener("click", rotateSelectedPages);
+        docEnhanceBtn.addEventListener("click", enhanceSelectedPages);
         applyRangeBtn.addEventListener("click", applyRangeSelection); // 綁定套用範圍按鈕
 
         fileInput.addEventListener("change", (e) => {
@@ -620,6 +633,7 @@
           exportPngBtn.disabled = !hasSelection;
           exportMdBtn.disabled = !hasSelection;
           rotateBtn.disabled = !hasSelection;
+          docEnhanceBtn.disabled = !hasSelection;
 
           // 範圍選取，只要有檔案存在就能用
           rangeStartInput.disabled = !hasPages;
@@ -691,6 +705,71 @@
             renderPagesGrid();
           } catch (error) {
             console.error("旋轉處理失敗:", error);
+          } finally {
+            hideLoading();
+          }
+        }
+
+        // 影像處理：黑文白文 (高對比、去雜訊、底色變白)
+        async function applyDocEnhancement(base64) {
+          return new Promise((resolve) => {
+            const img = new Image();
+            img.onload = () => {
+              const canvas = document.createElement("canvas");
+              const ctx = canvas.getContext("2d");
+              canvas.width = img.width;
+              canvas.height = img.height;
+              ctx.drawImage(img, 0, 0);
+
+              const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+              const data = imageData.data;
+
+              // 影像演算法：轉灰階並套用線性對比拉伸與閾值過濾
+              for (let i = 0; i < data.length; i += 4) {
+                const r = data[i];
+                const g = data[i + 1];
+                const b = data[i + 2];
+                
+                // 轉灰階 (人眼感官權重)
+                let gray = 0.299 * r + 0.587 * g + 0.114 * b;
+
+                // 增強對比：低於120的變更深，高於180的直接變全白(255)
+                if (gray > 160) {
+                  gray = 255; 
+                } else if (gray < 90) {
+                  gray = Math.max(0, gray - 50);
+                } else {
+                  // 中間區域拉開間隔
+                  gray = (gray - 90) * (255 / (160 - 90));
+                }
+
+                data[i] = data[i + 1] = data[i + 2] = gray;
+              }
+
+              ctx.putImageData(imageData, 0, 0);
+              resolve(canvas.toDataURL("image/jpeg", 0.9));
+            };
+            img.src = base64;
+          });
+        }
+
+        // 批次執行黑文白文處理
+        async function enhanceSelectedPages() {
+          const selectedPages = pagesArray.filter((p) => p.selected);
+          if (selectedPages.length === 0) return;
+
+          showLoading("影像處理中", "正在將照片轉換為清晰文檔格式...");
+
+          try {
+            for (let p of selectedPages) {
+              // 對當前的 dataUrl (包含已旋轉的狀態) 進行處理
+              p.dataUrl = await applyDocEnhancement(p.dataUrl);
+              // 同時更新原始圖，避免旋轉後遺失處理效果
+              p.originalThumbnailUrl = p.dataUrl;
+            }
+            renderPagesGrid();
+          } catch (error) {
+            console.error("影像處理失敗:", error);
           } finally {
             hideLoading();
           }
