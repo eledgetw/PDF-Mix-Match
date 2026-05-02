@@ -1,376 +1,527 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="zh-TW">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>PDF Mix & Match - 頁面編輯器</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- FontAwesome -->
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
-    
+    <link
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css"
+      rel="stylesheet"
+    />
+
     <!-- PDF.js (用於渲染 PDF 頁面為縮圖和 PNG) -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <script>
-        // 設定 PDF.js Worker 路徑
-        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+      // 設定 PDF.js Worker 路徑
+      pdfjsLib.GlobalWorkerOptions.workerSrc =
+        "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
     </script>
-    
+
     <!-- pdf-lib (用於重新組合和輸出 PDF) -->
     <script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
-    
+
     <!-- SortableJS (用於拖放排序) -->
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
-    
+
     <!-- JSZip (用於將多張 PNG 打包下載) -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 
     <style>
-        body { background-color: #f3f4f6; }
-        .dropzone-active {
-            border-color: #ef4444 !important;
-            background-color: #fef2f2 !important;
-        }
-        /* 隱藏捲軸 */
-        .no-scrollbar::-webkit-scrollbar { display: none; }
-        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-        
-        /* 縮圖選取狀態的樣式變化 */
-        .page-card { transition: all 0.2s ease-in-out; cursor: grab; user-select: none; }
-        .page-card:active { cursor: grabbing; }
-        .page-card.selected { border-color: #ef4444; box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.2); }
-        .page-card:not(.selected) img { opacity: 0.6; filter: grayscale(50%); }
-        
-        /* 拖曳時的視覺回饋 */
-        .sortable-ghost { opacity: 0.3; }
-        .sortable-drag { transform: scale(1.05); box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1); }
-    </style>
-</head>
-<body class="font-sans text-gray-800 h-screen flex flex-col overflow-hidden">
+      body {
+        background-color: #f3f4f6;
+      }
+      .dropzone-active {
+        border-color: #ef4444 !important;
+        background-color: #fef2f2 !important;
+      }
+      /* 隱藏捲軸 */
+      .no-scrollbar::-webkit-scrollbar {
+        display: none;
+      }
+      .no-scrollbar {
+        -ms-overflow-style: none;
+        scrollbar-width: none;
+      }
 
+      /* 縮圖選取狀態的樣式變化 */
+      .page-card {
+        transition: all 0.2s ease-in-out;
+        cursor: grab;
+        user-select: none;
+      }
+      .page-card:active {
+        cursor: grabbing;
+      }
+      .page-card.selected {
+        border-color: #ef4444;
+        box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.2);
+      }
+      .page-card:not(.selected) img {
+        opacity: 0.6;
+        filter: grayscale(50%);
+      }
+
+      /* 拖曳時的視覺回饋 */
+      .sortable-ghost {
+        opacity: 0.3;
+      }
+      .sortable-drag {
+        transform: scale(1.05);
+        box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+      }
+    </style>
+  </head>
+  <body class="font-sans text-gray-800 h-screen flex flex-col overflow-hidden">
     <!-- 頂部導覽列 (深色專業配色) -->
     <header class="bg-slate-900 text-white shadow-md z-20 flex-shrink-0">
-        <div class="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
-            <div class="flex items-center gap-3">
-                <div class="bg-red-500 p-2 rounded-lg text-white">
-                    <i class="fa-solid fa-file-pdf text-xl"></i>
-                </div>
-                <h1 class="text-xl font-bold tracking-wider">PDF Mix & Match</h1>
-            </div>
-            <div class="flex items-center gap-4">
-                <!-- 允許上傳 PDF 與圖片 -->
-                <input type="file" id="fileInput" multiple accept="application/pdf, image/png, image/jpeg, image/jpg" class="hidden">
-                <button id="uploadBtn" class="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white text-sm font-medium rounded-md transition-colors shadow-sm flex items-center">
-                    <i class="fa-solid fa-cloud-arrow-up mr-2"></i> 新增 PDF / 圖片
-                </button>
-            </div>
+      <div
+        class="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between"
+      >
+        <div class="flex items-center gap-3">
+          <div class="bg-red-500 p-2 rounded-lg text-white">
+            <i class="fa-solid fa-file-pdf text-xl"></i>
+          </div>
+          <h1 class="text-xl font-bold tracking-wider">PDF Mix & Match</h1>
         </div>
+        <div class="flex items-center gap-4">
+          <!-- 允許上傳 PDF 與圖片 -->
+          <input
+            type="file"
+            id="fileInput"
+            multiple
+            accept="application/pdf, image/png, image/jpeg, image/jpg"
+            class="hidden"
+          />
+          <button
+            id="uploadBtn"
+            class="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white text-sm font-medium rounded-md transition-colors shadow-sm flex items-center"
+          >
+            <i class="fa-solid fa-cloud-arrow-up mr-2"></i> 新增 PDF / 圖片
+          </button>
+        </div>
+      </div>
     </header>
 
     <!-- 操作工具列 -->
-    <div class="bg-white border-b border-gray-200 shadow-sm z-10 flex-shrink-0 overflow-x-auto no-scrollbar">
-        <div class="max-w-7xl mx-auto px-4 py-3 flex flex-col xl:flex-row justify-between items-center gap-3 min-w-max">
-            <div class="flex flex-wrap items-center gap-3 w-full xl:w-auto">
-                <button id="selectAllBtn" class="text-sm font-medium text-slate-600 hover:text-slate-900 px-2 py-1">
-                    <i class="fa-regular fa-square-check mr-1"></i> 全選
-                </button>
-                <button id="deselectAllBtn" class="text-sm font-medium text-slate-600 hover:text-slate-900 px-2 py-1">
-                    <i class="fa-regular fa-square mr-1"></i> 取消全選
-                </button>
-                <span class="text-sm text-gray-300">|</span>
-                
-                <!-- 新增：範圍選擇 -->
-                <div class="flex items-center gap-1.5 bg-slate-50 p-1 rounded border border-gray-100">
-                    <span class="text-sm font-medium text-slate-600 pl-1"><i class="fa-solid fa-arrow-down-1-9 mr-1"></i>選取範圍:</span>
-                    <input type="number" id="rangeStart" disabled class="w-14 h-7 px-1 text-sm border border-gray-300 rounded focus:ring-red-500 focus:border-red-500 disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed text-center" placeholder="起" min="1">
-                    <span class="text-sm text-slate-400">-</span>
-                    <input type="number" id="rangeEnd" disabled class="w-14 h-7 px-1 text-sm border border-gray-300 rounded focus:ring-red-500 focus:border-red-500 disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed text-center" placeholder="迄" min="1">
-                    <button id="applyRangeBtn" disabled class="px-3 py-1 ml-1 text-xs font-bold bg-slate-200 hover:bg-slate-300 text-slate-700 rounded transition disabled:opacity-40 disabled:cursor-not-allowed shadow-sm">
-                        套用
-                    </button>
-                </div>
-                
-                <span class="text-sm text-gray-300">|</span>
-                
-                <!-- 旋轉按鈕 -->
-                <button id="rotateBtn" disabled class="text-sm font-medium text-slate-600 hover:text-slate-900 disabled:opacity-40 disabled:cursor-not-allowed px-2 py-1 transition-opacity">
-                    <i class="fa-solid fa-rotate-right mr-1"></i> 旋轉90度
-                </button>
-                
-                <span class="text-sm text-gray-300">|</span>
-                <span id="selectionCount" class="text-sm font-bold text-red-600 bg-red-50 px-3 py-1 rounded-full">已選擇 0 頁</span>
-            </div>
-            
-            <div class="flex items-center gap-3 w-full xl:w-auto mt-2 xl:mt-0">
-                <!-- 壓縮選項 -->
-                <select id="qualitySelect" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-md focus:ring-red-500 focus:border-red-500 block p-2">
-                    <option value="high">原始高畫質</option>
-                    <option value="medium" selected>標準壓縮 (推薦)</option>
-                    <option value="low">高壓縮 (小檔案)</option>
-                </select>
-                <button id="exportPdfBtn" disabled class="flex-1 sm:flex-none px-5 py-2 bg-red-600 hover:bg-red-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white text-sm font-medium rounded-md transition-colors shadow-sm flex items-center justify-center">
-                    <i class="fa-solid fa-file-pdf mr-2"></i> 匯出為 PDF
-                </button>
-                <button id="exportPngBtn" disabled class="flex-1 sm:flex-none px-5 py-2 border-2 border-slate-200 hover:border-slate-300 disabled:border-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed text-slate-700 text-sm font-medium rounded-md transition-colors bg-white flex items-center justify-center">
-                    <i class="fa-solid fa-images mr-2"></i> 匯出圖片
-                </button>
-            </div>
+    <div
+      class="bg-white border-b border-gray-200 shadow-sm z-10 flex-shrink-0 overflow-x-auto no-scrollbar"
+    >
+      <div
+        class="max-w-7xl mx-auto px-4 py-3 flex flex-col xl:flex-row justify-between items-center gap-3 min-w-max"
+      >
+        <div class="flex flex-wrap items-center gap-3 w-full xl:w-auto">
+          <button
+            id="selectAllBtn"
+            class="text-sm font-medium text-slate-600 hover:text-slate-900 px-2 py-1"
+          >
+            <i class="fa-regular fa-square-check mr-1"></i> 全選
+          </button>
+          <button
+            id="deselectAllBtn"
+            class="text-sm font-medium text-slate-600 hover:text-slate-900 px-2 py-1"
+          >
+            <i class="fa-regular fa-square mr-1"></i> 取消全選
+          </button>
+          <span class="text-sm text-gray-300">|</span>
+
+          <!-- 新增：範圍選擇 -->
+          <div
+            class="flex items-center gap-1.5 bg-slate-50 p-1 rounded border border-gray-100"
+          >
+            <span class="text-sm font-medium text-slate-600 pl-1"
+              ><i class="fa-solid fa-arrow-down-1-9 mr-1"></i>選取範圍:</span
+            >
+            <input
+              type="number"
+              id="rangeStart"
+              disabled
+              class="w-14 h-7 px-1 text-sm border border-gray-300 rounded focus:ring-red-500 focus:border-red-500 disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed text-center"
+              placeholder="起"
+              min="1"
+            />
+            <span class="text-sm text-slate-400">-</span>
+            <input
+              type="number"
+              id="rangeEnd"
+              disabled
+              class="w-14 h-7 px-1 text-sm border border-gray-300 rounded focus:ring-red-500 focus:border-red-500 disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed text-center"
+              placeholder="迄"
+              min="1"
+            />
+            <button
+              id="applyRangeBtn"
+              disabled
+              class="px-3 py-1 ml-1 text-xs font-bold bg-slate-200 hover:bg-slate-300 text-slate-700 rounded transition disabled:opacity-40 disabled:cursor-not-allowed shadow-sm"
+            >
+              套用
+            </button>
+          </div>
+
+          <span class="text-sm text-gray-300">|</span>
+
+          <!-- 旋轉按鈕 -->
+          <button
+            id="rotateBtn"
+            disabled
+            class="text-sm font-medium text-slate-600 hover:text-slate-900 disabled:opacity-40 disabled:cursor-not-allowed px-2 py-1 transition-opacity"
+          >
+            <i class="fa-solid fa-rotate-right mr-1"></i> 旋轉90度
+          </button>
+
+          <span class="text-sm text-gray-300">|</span>
+          <span
+            id="selectionCount"
+            class="text-sm font-bold text-red-600 bg-red-50 px-3 py-1 rounded-full"
+            >已選擇 0 頁</span
+          >
         </div>
+
+        <div class="flex items-center gap-3 w-full xl:w-auto mt-2 xl:mt-0">
+          <!-- 壓縮選項 -->
+          <select
+            id="qualitySelect"
+            class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-md focus:ring-red-500 focus:border-red-500 block p-2"
+          >
+            <option value="high">原始高畫質</option>
+            <option value="medium" selected>標準壓縮 (推薦)</option>
+            <option value="low">高壓縮 (小檔案)</option>
+          </select>
+          <button
+            id="exportMdBtn"
+            disabled
+            class="flex-1 sm:flex-none px-5 py-2 border-2 border-slate-200 hover:border-slate-300 disabled:border-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed text-slate-700 text-sm font-medium rounded-md transition-colors bg-white flex items-center justify-center"
+          >
+            <i class="fa-brands fa-markdown mr-2"></i> 匯出 MD
+          </button>
+          <button
+            id="exportPdfBtn"
+            disabled
+            class="flex-1 sm:flex-none px-5 py-2 bg-red-600 hover:bg-red-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white text-sm font-medium rounded-md transition-colors shadow-sm flex items-center justify-center"
+          >
+            <i class="fa-solid fa-file-pdf mr-2"></i> 匯出為 PDF
+          </button>
+          <button
+            id="exportPngBtn"
+            disabled
+            class="flex-1 sm:flex-none px-5 py-2 border-2 border-slate-200 hover:border-slate-300 disabled:border-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed text-slate-700 text-sm font-medium rounded-md transition-colors bg-white flex items-center justify-center"
+          >
+            <i class="fa-solid fa-images mr-2"></i> 匯出圖片
+          </button>
+        </div>
+      </div>
     </div>
 
     <!-- 主要工作區 (可捲動) -->
     <main id="workspace" class="flex-grow overflow-y-auto p-6 relative">
-        
-        <!-- 空狀態 / 拖放區 -->
-        <div id="emptyState" class="absolute inset-4 border-2 border-dashed border-gray-300 rounded-2xl flex flex-col items-center justify-center bg-gray-50/50 transition-colors z-0">
-            <div class="bg-white p-6 rounded-full shadow-sm mb-4 border border-gray-100">
-                <i class="fa-solid fa-layer-group text-5xl text-red-400"></i>
-            </div>
-            <h2 class="text-2xl font-bold text-slate-800 mb-2">拖放您的 PDF 或圖片檔案至此</h2>
-            <p class="text-slate-500 mb-6 text-center max-w-md">我們將為您拆解 PDF 頁面並匯入圖片。<br>您可以自由拖放排序、Shift 多選、旋轉方向，最後組合下載。</p>
-            <button id="emptyUploadBtn" class="px-6 py-3 bg-slate-800 text-white font-medium rounded-lg hover:bg-slate-700 transition shadow-md">
-                選擇檔案開始
-            </button>
+      <!-- 空狀態 / 拖放區 -->
+      <div
+        id="emptyState"
+        class="absolute inset-4 border-2 border-dashed border-gray-300 rounded-2xl flex flex-col items-center justify-center bg-gray-50/50 transition-colors z-0"
+      >
+        <div
+          class="bg-white p-6 rounded-full shadow-sm mb-4 border border-gray-100"
+        >
+          <i class="fa-solid fa-layer-group text-5xl text-red-400"></i>
         </div>
+        <h2 class="text-2xl font-bold text-slate-800 mb-2">
+          拖放您的 PDF 或圖片檔案至此
+        </h2>
+        <p class="text-slate-500 mb-6 text-center max-w-md">
+          我們將為您拆解 PDF 頁面並匯入圖片。<br />您可以自由拖放排序、Shift
+          多選、旋轉方向，最後組合下載。
+        </p>
+        <button
+          id="emptyUploadBtn"
+          class="px-6 py-3 bg-slate-800 text-white font-medium rounded-lg hover:bg-slate-700 transition shadow-md"
+        >
+          選擇檔案開始
+        </button>
+      </div>
 
-        <!-- 頁面縮圖網格 -->
-        <div id="pagesGrid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-6 pb-20 relative z-10 hidden">
-            <!-- 透過 JS 動態產生縮圖卡片 -->
-        </div>
+      <!-- 頁面縮圖網格 -->
+      <div
+        id="pagesGrid"
+        class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-6 pb-20 relative z-10 hidden"
+      >
+        <!-- 透過 JS 動態產生縮圖卡片 -->
+      </div>
     </main>
 
     <!-- 載入中覆蓋層 -->
-    <div id="loadingOverlay" class="fixed inset-0 bg-slate-900/70 z-50 hidden flex-col items-center justify-center text-white backdrop-blur-sm">
-        <i class="fa-solid fa-circle-notch fa-spin text-5xl text-red-500 mb-4"></i>
-        <h3 id="loadingTitle" class="text-2xl font-bold mb-2">處理中...</h3>
-        <p id="loadingDesc" class="text-slate-300">正在解析檔案</p>
+    <div
+      id="loadingOverlay"
+      class="fixed inset-0 bg-slate-900/70 z-50 hidden flex-col items-center justify-center text-white backdrop-blur-sm"
+    >
+      <i
+        class="fa-solid fa-circle-notch fa-spin text-5xl text-red-500 mb-4"
+      ></i>
+      <h3 id="loadingTitle" class="text-2xl font-bold mb-2">處理中...</h3>
+      <p id="loadingDesc" class="text-slate-300">正在解析檔案</p>
     </div>
 
     <script>
-        document.addEventListener('DOMContentLoaded', () => {
-            // --- 狀態與變數 ---
-            let filesData = {}; 
-            let pagesArray = []; // 儲存每一頁的資訊物件
-            let sortableInstance = null;
-            let lastClickedIndex = -1; // 用於紀錄 Shift 多選時的起點
+      document.addEventListener("DOMContentLoaded", () => {
+        // --- 狀態與變數 ---
+        let filesData = {};
+        let pagesArray = []; // 儲存每一頁的資訊物件
+        let sortableInstance = null;
+        let lastClickedIndex = -1; // 用於紀錄 Shift 多選時的起點
 
-            // --- DOM 元素 ---
-            const fileInput = document.getElementById('fileInput');
-            const workspace = document.getElementById('workspace');
-            const emptyState = document.getElementById('emptyState');
-            const pagesGrid = document.getElementById('pagesGrid');
-            const selectionCount = document.getElementById('selectionCount');
-            const exportPdfBtn = document.getElementById('exportPdfBtn');
-            const exportPngBtn = document.getElementById('exportPngBtn');
-            const rotateBtn = document.getElementById('rotateBtn');
-            
-            // 新增範圍選擇的 DOM 元素
-            const rangeStartInput = document.getElementById('rangeStart');
-            const rangeEndInput = document.getElementById('rangeEnd');
-            const applyRangeBtn = document.getElementById('applyRangeBtn');
+        // --- DOM 元素 ---
+        const fileInput = document.getElementById("fileInput");
+        const workspace = document.getElementById("workspace");
+        const emptyState = document.getElementById("emptyState");
+        const pagesGrid = document.getElementById("pagesGrid");
+        const selectionCount = document.getElementById("selectionCount");
+        const exportPdfBtn = document.getElementById("exportPdfBtn");
+        const exportPngBtn = document.getElementById("exportPngBtn");
+        const exportMdBtn = document.getElementById("exportMdBtn");
+        const rotateBtn = document.getElementById("rotateBtn");
 
-            const loadingOverlay = document.getElementById('loadingOverlay');
-            const loadingTitle = document.getElementById('loadingTitle');
-            const loadingDesc = document.getElementById('loadingDesc');
+        // 新增範圍選擇的 DOM 元素
+        const rangeStartInput = document.getElementById("rangeStart");
+        const rangeEndInput = document.getElementById("rangeEnd");
+        const applyRangeBtn = document.getElementById("applyRangeBtn");
 
-            // --- 事件監聽器綁定 ---
-            document.getElementById('uploadBtn').addEventListener('click', () => fileInput.click());
-            document.getElementById('emptyUploadBtn').addEventListener('click', () => fileInput.click());
-            document.getElementById('selectAllBtn').addEventListener('click', () => toggleAll(true));
-            document.getElementById('deselectAllBtn').addEventListener('click', () => toggleAll(false));
-            
-            rotateBtn.addEventListener('click', rotateSelectedPages);
-            applyRangeBtn.addEventListener('click', applyRangeSelection); // 綁定套用範圍按鈕
-            
-            fileInput.addEventListener('change', (e) => {
-                if(e.target.files.length > 0) processUploadedFiles(e.target.files);
-                fileInput.value = ''; // 允許重複上傳
-            });
+        const loadingOverlay = document.getElementById("loadingOverlay");
+        const loadingTitle = document.getElementById("loadingTitle");
+        const loadingDesc = document.getElementById("loadingDesc");
 
-            exportPdfBtn.addEventListener('click', exportAsPDF);
-            exportPngBtn.addEventListener('click', exportAsPNG);
+        // --- 事件監聽器綁定 ---
+        document
+          .getElementById("uploadBtn")
+          .addEventListener("click", () => fileInput.click());
+        document
+          .getElementById("emptyUploadBtn")
+          .addEventListener("click", () => fileInput.click());
+        document
+          .getElementById("selectAllBtn")
+          .addEventListener("click", () => toggleAll(true));
+        document
+          .getElementById("deselectAllBtn")
+          .addEventListener("click", () => toggleAll(false));
 
-            // 拖放事件
-            workspace.addEventListener('dragover', (e) => {
-                e.preventDefault();
-                emptyState.classList.add('dropzone-active');
-            });
-            workspace.addEventListener('dragleave', () => {
-                emptyState.classList.remove('dropzone-active');
-            });
-            workspace.addEventListener('drop', (e) => {
-                e.preventDefault();
-                emptyState.classList.remove('dropzone-active');
-                if(e.dataTransfer.files.length > 0) processUploadedFiles(e.dataTransfer.files);
-            });
+        rotateBtn.addEventListener("click", rotateSelectedPages);
+        applyRangeBtn.addEventListener("click", applyRangeSelection); // 綁定套用範圍按鈕
 
-            // --- 核心邏輯 ---
+        fileInput.addEventListener("change", (e) => {
+          if (e.target.files.length > 0) processUploadedFiles(e.target.files);
+          fileInput.value = ""; // 允許重複上傳
+        });
 
-            // 新增：處理範圍選擇的邏輯
-            function applyRangeSelection() {
-                if (pagesArray.length === 0) return;
+        exportPdfBtn.addEventListener("click", exportAsPDF);
+        exportPngBtn.addEventListener("click", exportAsPNG);
+        exportMdBtn.addEventListener("click", exportAsMarkdown);
 
-                const startStr = rangeStartInput.value;
-                const endStr = rangeEndInput.value;
+        // 拖放事件
+        workspace.addEventListener("dragover", (e) => {
+          e.preventDefault();
+          emptyState.classList.add("dropzone-active");
+        });
+        workspace.addEventListener("dragleave", () => {
+          emptyState.classList.remove("dropzone-active");
+        });
+        workspace.addEventListener("drop", (e) => {
+          e.preventDefault();
+          emptyState.classList.remove("dropzone-active");
+          if (e.dataTransfer.files.length > 0)
+            processUploadedFiles(e.dataTransfer.files);
+        });
 
-                // 如果未填寫，自動給定第一頁或最後一頁
-                let start = startStr ? parseInt(startStr, 10) : 1;
-                let end = endStr ? parseInt(endStr, 10) : pagesArray.length;
+        // --- 核心邏輯 ---
 
-                // 防呆處理
-                if (isNaN(start) || start < 1) start = 1;
-                if (isNaN(end) || end > pagesArray.length) end = pagesArray.length;
+        // 新增：處理範圍選擇的邏輯
+        function applyRangeSelection() {
+          if (pagesArray.length === 0) return;
 
-                // 如果起點大於終點，自動交換
-                if (start > end) {
-                    let temp = start;
-                    start = end;
-                    end = temp;
+          const startStr = rangeStartInput.value;
+          const endStr = rangeEndInput.value;
+
+          // 如果未填寫，自動給定第一頁或最後一頁
+          let start = startStr ? parseInt(startStr, 10) : 1;
+          let end = endStr ? parseInt(endStr, 10) : pagesArray.length;
+
+          // 防呆處理
+          if (isNaN(start) || start < 1) start = 1;
+          if (isNaN(end) || end > pagesArray.length) end = pagesArray.length;
+
+          // 如果起點大於終點，自動交換
+          if (start > end) {
+            let temp = start;
+            start = end;
+            end = temp;
+          }
+
+          // 根據當下陣列順序(UI顯示順序)來設定選取狀態，並取消不在此範圍內的
+          pagesArray.forEach((pageObj, index) => {
+            const currentDisplayItemNumber = index + 1;
+            if (
+              currentDisplayItemNumber >= start &&
+              currentDisplayItemNumber <= end
+            ) {
+              pageObj.selected = true;
+            } else {
+              pageObj.selected = false;
+            }
+          });
+
+          // 重置 Shift 多選的錨點
+          lastClickedIndex = -1;
+
+          // 重新渲染畫面以更新狀態
+          renderPagesGrid();
+        }
+
+        // 處理上傳的檔案 (支援 PDF 和 圖片)
+        async function processUploadedFiles(files) {
+          showLoading("讀取檔案中", "正在準備解析...");
+
+          // 依檔案名稱進行自然排序
+          const filesArray = Array.from(files).sort((a, b) => {
+            return a.name.localeCompare(b.name, "zh-TW", { numeric: true });
+          });
+
+          try {
+            for (const file of filesArray) {
+              const isPdf = file.type === "application/pdf";
+              const isImage =
+                file.type === "image/png" ||
+                file.type === "image/jpeg" ||
+                file.type === "image/jpg";
+
+              if (!isPdf && !isImage) continue;
+
+              const fileId =
+                "file_" +
+                Date.now() +
+                "_" +
+                Math.random().toString(36).substr(2, 9);
+              filesData[fileId] = {
+                file: file,
+                name: file.name,
+                type: file.type,
+              };
+
+              const arrayBuffer = await file.arrayBuffer();
+
+              if (isPdf) {
+                const loadingTask = pdfjsLib.getDocument({
+                  data: new Uint8Array(arrayBuffer),
+                });
+                const pdfDocument = await loadingTask.promise;
+                const numPages = pdfDocument.numPages;
+
+                for (let i = 1; i <= numPages; i++) {
+                  updateLoadingText(
+                    `解析 ${file.name}`,
+                    `正在產生縮圖... ( ${i} / ${numPages} )`,
+                  );
+                  const page = await pdfDocument.getPage(i);
+
+                  const viewport = page.getViewport({ scale: 1.5 });
+                  const canvas = document.createElement("canvas");
+                  const context = canvas.getContext("2d");
+                  canvas.height = viewport.height;
+                  canvas.width = viewport.width;
+
+                  context.fillStyle = "#ffffff";
+                  context.fillRect(0, 0, canvas.width, canvas.height);
+
+                  await page.render({
+                    canvasContext: context,
+                    viewport: viewport,
+                  }).promise;
+                  const dataUrl = canvas.toDataURL("image/jpeg", 0.8);
+
+                  pagesArray.push({
+                    id: "page_" + Date.now() + "_" + i,
+                    fileId: fileId,
+                    originalPageIndex: i - 1,
+                    displayNumber: i,
+                    originalThumbnailUrl: dataUrl,
+                    dataUrl: dataUrl,
+                    selected: true,
+                    rotation: 0,
+                  });
                 }
+              } else if (isImage) {
+                updateLoadingText(`解析 ${file.name}`, `正在處理圖片...`);
 
-                // 根據當下陣列順序(UI顯示順序)來設定選取狀態，並取消不在此範圍內的
-                pagesArray.forEach((pageObj, index) => {
-                    const currentDisplayItemNumber = index + 1;
-                    if (currentDisplayItemNumber >= start && currentDisplayItemNumber <= end) {
-                        pageObj.selected = true;
-                    } else {
-                        pageObj.selected = false;
-                    }
+                const blob = new Blob([arrayBuffer], { type: file.type });
+                const tempUrl = URL.createObjectURL(blob);
+
+                const img = new Image();
+                await new Promise((resolve, reject) => {
+                  img.onload = resolve;
+                  img.onerror = reject;
+                  img.src = tempUrl;
                 });
 
-                // 重置 Shift 多選的錨點
-                lastClickedIndex = -1;
-                
-                // 重新渲染畫面以更新狀態
-                renderPagesGrid();
-            }
+                const canvas = document.createElement("canvas");
+                const context = canvas.getContext("2d");
+                canvas.width = img.width;
+                canvas.height = img.height;
 
-            // 處理上傳的檔案 (支援 PDF 和 圖片)
-            async function processUploadedFiles(files) {
-                showLoading("讀取檔案中", "正在準備解析...");
-                
-                // 依檔案名稱進行自然排序
-                const filesArray = Array.from(files).sort((a, b) => {
-                    return a.name.localeCompare(b.name, 'zh-TW', { numeric: true });
+                context.fillStyle = "#ffffff";
+                context.fillRect(0, 0, canvas.width, canvas.height);
+                context.drawImage(img, 0, 0);
+
+                const dataUrl = canvas.toDataURL("image/jpeg", 0.8);
+                URL.revokeObjectURL(tempUrl);
+
+                pagesArray.push({
+                  id: "page_" + Date.now() + "_img",
+                  fileId: fileId,
+                  originalPageIndex: 0,
+                  displayNumber: "圖",
+                  originalThumbnailUrl: dataUrl,
+                  dataUrl: dataUrl,
+                  selected: true,
+                  rotation: 0,
                 });
-                
-                try {
-                    for (const file of filesArray) {
-                        const isPdf = file.type === 'application/pdf';
-                        const isImage = file.type === 'image/png' || file.type === 'image/jpeg' || file.type === 'image/jpg';
-
-                        if (!isPdf && !isImage) continue;
-                        
-                        const fileId = 'file_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
-                        filesData[fileId] = { file: file, name: file.name, type: file.type };
-
-                        const arrayBuffer = await file.arrayBuffer();
-
-                        if (isPdf) {
-                            const loadingTask = pdfjsLib.getDocument({ data: new Uint8Array(arrayBuffer) });
-                            const pdfDocument = await loadingTask.promise;
-                            const numPages = pdfDocument.numPages;
-
-                            for (let i = 1; i <= numPages; i++) {
-                                updateLoadingText(`解析 ${file.name}`, `正在產生縮圖... ( ${i} / ${numPages} )`);
-                                const page = await pdfDocument.getPage(i);
-                                
-                                const viewport = page.getViewport({ scale: 1.5 });
-                                const canvas = document.createElement('canvas');
-                                const context = canvas.getContext('2d');
-                                canvas.height = viewport.height;
-                                canvas.width = viewport.width;
-
-                                context.fillStyle = '#ffffff';
-                                context.fillRect(0, 0, canvas.width, canvas.height);
-
-                                await page.render({ canvasContext: context, viewport: viewport }).promise;
-                                const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
-
-                                pagesArray.push({
-                                    id: 'page_' + Date.now() + '_' + i,
-                                    fileId: fileId,
-                                    originalPageIndex: i - 1,
-                                    displayNumber: i,
-                                    originalThumbnailUrl: dataUrl,
-                                    dataUrl: dataUrl,
-                                    selected: true,
-                                    rotation: 0 
-                                });
-                            }
-                        } else if (isImage) {
-                            updateLoadingText(`解析 ${file.name}`, `正在處理圖片...`);
-                            
-                            const blob = new Blob([arrayBuffer], { type: file.type });
-                            const tempUrl = URL.createObjectURL(blob);
-                            
-                            const img = new Image();
-                            await new Promise((resolve, reject) => {
-                                img.onload = resolve;
-                                img.onerror = reject;
-                                img.src = tempUrl;
-                            });
-
-                            const canvas = document.createElement('canvas');
-                            const context = canvas.getContext('2d');
-                            canvas.width = img.width;
-                            canvas.height = img.height;
-                            
-                            context.fillStyle = '#ffffff';
-                            context.fillRect(0, 0, canvas.width, canvas.height);
-                            context.drawImage(img, 0, 0);
-                            
-                            const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
-                            URL.revokeObjectURL(tempUrl);
-
-                            pagesArray.push({
-                                id: 'page_' + Date.now() + '_img',
-                                fileId: fileId,
-                                originalPageIndex: 0,
-                                displayNumber: '圖',
-                                originalThumbnailUrl: dataUrl,
-                                dataUrl: dataUrl,
-                                selected: true,
-                                rotation: 0
-                            });
-                        }
-                    }
-                    
-                    lastClickedIndex = -1; // 上傳新檔案後重置
-                    renderPagesGrid();
-                    initSortable();
-
-                } catch (error) {
-                    console.error("處理檔案時發生錯誤:", error);
-                    alert("處理檔案時發生錯誤，請確認檔案是否損毀或受密碼保護。\n詳細錯誤：" + error.message);
-                } finally {
-                    hideLoading();
-                }
+              }
             }
 
-            // 渲染頁面網格
-            function renderPagesGrid() {
-                if (pagesArray.length === 0) {
-                    emptyState.classList.remove('hidden');
-                    pagesGrid.classList.add('hidden');
-                    updateToolbar();
-                    return;
-                }
+            lastClickedIndex = -1; // 上傳新檔案後重置
+            renderPagesGrid();
+            initSortable();
+          } catch (error) {
+            console.error("處理檔案時發生錯誤:", error);
+            alert(
+              "處理檔案時發生錯誤，請確認檔案是否損毀或受密碼保護。\n詳細錯誤：" +
+                error.message,
+            );
+          } finally {
+            hideLoading();
+          }
+        }
 
-                emptyState.classList.add('hidden');
-                pagesGrid.classList.remove('hidden');
-                pagesGrid.innerHTML = '';
+        // 渲染頁面網格
+        function renderPagesGrid() {
+          if (pagesArray.length === 0) {
+            emptyState.classList.remove("hidden");
+            pagesGrid.classList.add("hidden");
+            updateToolbar();
+            return;
+          }
 
-                pagesArray.forEach((pageObj, currentIndex) => {
-                    const card = document.createElement('div');
-                    const itemPosition = currentIndex + 1; // 目前顯示的張數編號
-                    card.className = `page-card relative bg-white border-2 rounded-xl overflow-hidden shadow-sm flex flex-col ${pageObj.selected ? 'selected border-red-500' : 'border-gray-200'}`;
-                    card.dataset.id = pageObj.id;
+          emptyState.classList.add("hidden");
+          pagesGrid.classList.remove("hidden");
+          pagesGrid.innerHTML = "";
 
-                    card.innerHTML = `
+          pagesArray.forEach((pageObj, currentIndex) => {
+            const card = document.createElement("div");
+            const itemPosition = currentIndex + 1; // 目前顯示的張數編號
+            card.className = `page-card relative bg-white border-2 rounded-xl overflow-hidden shadow-sm flex flex-col ${pageObj.selected ? "selected border-red-500" : "border-gray-200"}`;
+            card.dataset.id = pageObj.id;
+
+            card.innerHTML = `
                         <!-- 核取方塊 -->
                         <div class="absolute top-3 left-3 z-10 bg-white rounded-md shadow-sm pointer-events-none">
-                            <input type="checkbox" class="page-checkbox w-6 h-6 text-red-600 rounded border-gray-300 focus:ring-red-500 pointer-events-auto cursor-pointer m-1" ${pageObj.selected ? 'checked' : ''}>
+                            <input type="checkbox" class="page-checkbox w-6 h-6 text-red-600 rounded border-gray-300 focus:ring-red-500 pointer-events-auto cursor-pointer m-1" ${pageObj.selected ? "checked" : ""}>
                         </div>
                         
                         <!-- 左上角顯示當前排列順序編號 -->
@@ -387,407 +538,533 @@
                         <div class="bg-slate-50 border-t border-gray-200 px-3 py-2 flex justify-between items-center text-xs text-slate-500 font-medium">
                             <span class="truncate pr-2" title="${filesData[pageObj.fileId].name}">${filesData[pageObj.fileId].name}</span>
                             <span class="bg-slate-200 text-slate-700 px-2 py-0.5 rounded-full flex-shrink-0">
-                                ${pageObj.displayNumber === '圖' ? '<i class="fa-regular fa-image"></i>' : 'P.' + pageObj.displayNumber}
+                                ${pageObj.displayNumber === "圖" ? '<i class="fa-regular fa-image"></i>' : "P." + pageObj.displayNumber}
                             </span>
                         </div>
                     `;
 
-                    // Shift 多選邏輯
-                    card.addEventListener('click', (e) => {
-                        const checkbox = card.querySelector('.page-checkbox');
-                        
-                        // 若不是直接點擊 checkbox，我們先反轉其狀態以符合卡片點擊預期
-                        if(e.target.tagName !== 'INPUT') {
-                            checkbox.checked = !checkbox.checked;
-                        }
-                        const isChecked = checkbox.checked;
+            // Shift 多選邏輯
+            card.addEventListener("click", (e) => {
+              const checkbox = card.querySelector(".page-checkbox");
 
-                        // Shift-Click 範圍選取
-                        if (e.shiftKey && lastClickedIndex !== -1) {
-                            const start = Math.min(lastClickedIndex, currentIndex);
-                            const end = Math.max(lastClickedIndex, currentIndex);
-                            for (let i = start; i <= end; i++) {
-                                pagesArray[i].selected = isChecked;
-                            }
-                            // 重新繪製整個 Grid 以更新範圍內的樣式
-                            renderPagesGrid();
-                            return; 
-                        } else {
-                            // 一般單點
-                            pageObj.selected = isChecked;
-                            lastClickedIndex = currentIndex;
-                            
-                            // 更新當前卡片樣式
-                            if (pageObj.selected) {
-                                card.classList.add('selected', 'border-red-500');
-                                card.classList.remove('border-gray-200');
-                            } else {
-                                card.classList.remove('selected', 'border-red-500');
-                                card.classList.add('border-gray-200');
-                            }
-                            updateToolbar();
-                        }
-                    });
+              // 若不是直接點擊 checkbox，我們先反轉其狀態以符合卡片點擊預期
+              if (e.target.tagName !== "INPUT") {
+                checkbox.checked = !checkbox.checked;
+              }
+              const isChecked = checkbox.checked;
 
-                    pagesGrid.appendChild(card);
-                });
-                
-                updateToolbar();
-            }
-
-            // 初始化或更新 SortableJS
-            function initSortable() {
-                if (sortableInstance) {
-                    sortableInstance.destroy();
+              // Shift-Click 範圍選取
+              if (e.shiftKey && lastClickedIndex !== -1) {
+                const start = Math.min(lastClickedIndex, currentIndex);
+                const end = Math.max(lastClickedIndex, currentIndex);
+                for (let i = start; i <= end; i++) {
+                  pagesArray[i].selected = isChecked;
                 }
-                sortableInstance = new Sortable(pagesGrid, {
-                    animation: 150,
-                    ghostClass: 'sortable-ghost',
-                    dragClass: 'sortable-drag',
-                    filter: '.page-checkbox, .absolute',
-                    preventOnFilter: false,
-                    onEnd: function (evt) {
-                        const movedItem = pagesArray.splice(evt.oldIndex, 1)[0];
-                        pagesArray.splice(evt.newIndex, 0, movedItem);
-                        lastClickedIndex = -1; // 位置變更後重置多選錨點
-                        renderPagesGrid(); 
-                    }
-                });
-            }
-
-            // 更新工具列狀態
-            function updateToolbar() {
-                const totalPages = pagesArray.length;
-                const selectedPages = pagesArray.filter(p => p.selected);
-                selectionCount.textContent = `已選擇 ${selectedPages.length} 頁`;
-                
-                const hasSelection = selectedPages.length > 0;
-                const hasPages = totalPages > 0;
-
-                // 匯出與旋轉，需有勾選才能用
-                exportPdfBtn.disabled = !hasSelection;
-                exportPngBtn.disabled = !hasSelection;
-                rotateBtn.disabled = !hasSelection;
-
-                // 範圍選取，只要有檔案存在就能用
-                rangeStartInput.disabled = !hasPages;
-                rangeEndInput.disabled = !hasPages;
-                applyRangeBtn.disabled = !hasPages;
-                
-                if(hasPages) {
-                    rangeStartInput.max = totalPages;
-                    rangeEndInput.max = totalPages;
-                }
-            }
-
-            function toggleAll(isSelect) {
-                pagesArray.forEach(p => p.selected = isSelect);
-                lastClickedIndex = -1;
+                // 重新繪製整個 Grid 以更新範圍內的樣式
                 renderPagesGrid();
-            }
+                return;
+              } else {
+                // 一般單點
+                pageObj.selected = isChecked;
+                lastClickedIndex = currentIndex;
 
-            // 畫布影像旋轉輔助函式
-            async function getRotatedDataUrl(base64, degrees, mimeType = 'image/jpeg', quality = 0.8) {
-                if (degrees === 0) return base64;
-                return new Promise((resolve) => {
-                    const img = new Image();
-                    img.onload = () => {
-                        const canvas = document.createElement('canvas');
-                        const ctx = canvas.getContext('2d');
-                        
-                        if (degrees === 90 || degrees === 270) {
-                            canvas.width = img.height;
-                            canvas.height = img.width;
-                        } else {
-                            canvas.width = img.width;
-                            canvas.height = img.height;
-                        }
-                        
-                        ctx.fillStyle = '#ffffff';
-                        ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-                        ctx.translate(canvas.width / 2, canvas.height / 2);
-                        ctx.rotate((degrees * Math.PI) / 180);
-                        ctx.drawImage(img, -img.width / 2, -img.height / 2);
-                        
-                        resolve(canvas.toDataURL(mimeType, quality));
-                    };
-                    img.src = base64;
-                });
-            }
-
-            // 批次旋轉選擇的頁面
-            async function rotateSelectedPages() {
-                const selectedPages = pagesArray.filter(p => p.selected);
-                if (selectedPages.length === 0) return;
-
-                showLoading("旋轉頁面中", "正在重新產生預覽圖...");
-                
-                try {
-                    for (let p of selectedPages) {
-                        p.rotation = (p.rotation + 90) % 360;
-                        p.dataUrl = await getRotatedDataUrl(p.originalThumbnailUrl, p.rotation);
-                    }
-                    renderPagesGrid();
-                } catch (error) {
-                    console.error("旋轉處理失敗:", error);
-                } finally {
-                    hideLoading();
-                }
-            }
-
-            // --- 匯出功能 ---
-
-            // 匯出為 PDF
-            async function exportAsPDF() {
-                const selectedPages = pagesArray.filter(p => p.selected);
-                if (selectedPages.length === 0) return;
-
-                showLoading("組合 PDF 中", "正在處理並打包您的文件...");
-
-                try {
-                    const quality = document.getElementById('qualitySelect').value;
-                    const { PDFDocument, degrees } = PDFLib;
-                    const mergedPdf = await PDFDocument.create();
-                    
-                    const pdfPagesToCopy = {}; 
-                    selectedPages.forEach(p => {
-                        const fileData = filesData[p.fileId];
-                        if (fileData.type === 'application/pdf') {
-                            if (!pdfPagesToCopy[p.fileId]) pdfPagesToCopy[p.fileId] = new Set();
-                            pdfPagesToCopy[p.fileId].add(p.originalPageIndex);
-                        }
-                    });
-
-                    const copiedPagesCache = {}; 
-                    
-                    for (const fileId of Object.keys(pdfPagesToCopy)) {
-                        const fileData = filesData[fileId];
-                        const freshBuffer = await fileData.file.arrayBuffer();
-                        const sourceDoc = await PDFDocument.load(freshBuffer, { ignoreEncryption: true });
-                        
-                        const indicesArray = Array.from(pdfPagesToCopy[fileId]);
-                        const copiedPages = await mergedPdf.copyPages(sourceDoc, indicesArray);
-                        
-                        copiedPagesCache[fileId] = {};
-                        indicesArray.forEach((origIdx, i) => {
-                            copiedPagesCache[fileId][origIdx] = copiedPages[i];
-                        });
-                    }
-
-                    for (const pageObj of selectedPages) {
-                        const fileData = filesData[pageObj.fileId];
-                        
-                        if (fileData.type.startsWith('image/')) {
-                            let image;
-                            if (quality === 'high' && fileData.type === 'image/png') {
-                                const freshBuffer = await fileData.file.arrayBuffer();
-                                image = await mergedPdf.embedPng(freshBuffer);
-                            } else if (quality === 'high') {
-                                const freshBuffer = await fileData.file.arrayBuffer();
-                                image = await mergedPdf.embedJpg(freshBuffer);
-                            } else {
-                                const compressedDataUrl = await compressImageFile(fileData.file, quality);
-                                const base64Data = compressedDataUrl.split(',')[1];
-                                image = await mergedPdf.embedJpg(base64Data);
-                            }
-                            
-                            const { width, height } = image.scale(1);
-                            
-                            if (pageObj.rotation === 90 || pageObj.rotation === 270) {
-                                const page = mergedPdf.addPage([height, width]);
-                                page.setSize(width, height);
-                                page.drawImage(image, { x: 0, y: 0, width, height });
-                                page.setRotation(degrees(pageObj.rotation));
-                            } else {
-                                const page = mergedPdf.addPage([width, height]);
-                                page.drawImage(image, { x: 0, y: 0, width, height });
-                                if (pageObj.rotation === 180) {
-                                    page.setRotation(degrees(pageObj.rotation));
-                                }
-                            }
-                            
-                        } else {
-                            const pageToInsert = copiedPagesCache[pageObj.fileId][pageObj.originalPageIndex];
-                            mergedPdf.addPage(pageToInsert);
-                            
-                            if (pageObj.rotation) {
-                                const currentRotation = pageToInsert.getRotation().angle || 0;
-                                pageToInsert.setRotation(degrees((currentRotation + pageObj.rotation) % 360));
-                            }
-                        }
-                    }
-
-                    const pdfBytes = await mergedPdf.save();
-                    downloadFile(pdfBytes, 'MixMatch_Document.pdf', 'application/pdf');
-
-                } catch (error) {
-                    console.error("匯出 PDF 失敗:", error);
-                    alert("組合 PDF 時發生錯誤：\n" + (error.message || "未知的錯誤"));
-                } finally {
-                    hideLoading();
-                }
-            }
-
-            // 匯出為圖片 ZIP
-            async function exportAsPNG() {
-                const selectedPages = pagesArray.filter(p => p.selected);
-                if (selectedPages.length === 0) return;
-
-                showLoading("準備圖片中", "正在準備您的圖片檔案...");
-
-                try {
-                    const quality = document.getElementById('qualitySelect').value;
-                    const ext = quality === 'high' ? 'png' : 'jpg';
-
-                    if (selectedPages.length === 1) {
-                        const finalDataUrl = await getFinalImageDataUrl(selectedPages[0], quality);
-                        downloadURI(finalDataUrl, `MixMatch_Slide_1.${ext}`);
-                    } else {
-                        const zip = new JSZip();
-                        const imgFolder = zip.folder("MixMatch_Slides");
-                        
-                        for (let index = 0; index < selectedPages.length; index++) {
-                            updateLoadingText("打包圖片中", `正在處理圖片 (${index + 1}/${selectedPages.length})...`);
-                            const finalDataUrl = await getFinalImageDataUrl(selectedPages[index], quality);
-                            const base64Data = finalDataUrl.split(',')[1];
-                            imgFolder.file(`Slide_${String(index + 1).padStart(3, '0')}.${ext}`, base64Data, {base64: true});
-                        }
-                        
-                        updateLoadingText("打包圖片中", "正在產生 ZIP 壓縮檔...");
-                        const zipBlob = await zip.generateAsync({type:"blob"});
-                        const url = URL.createObjectURL(zipBlob);
-                        downloadURI(url, 'MixMatch_Slides.zip');
-                        URL.revokeObjectURL(url);
-                    }
-                } catch (error) {
-                    console.error("匯出圖片失敗:", error);
-                    alert("匯出圖片時發生錯誤。");
-                } finally {
-                    hideLoading();
-                }
-            }
-
-            // 壓縮與圖片處理
-            async function compressImageFile(file, quality) {
-                return new Promise((resolve, reject) => {
-                    const reader = new FileReader();
-                    reader.onload = (e) => {
-                        const img = new Image();
-                        img.onload = () => {
-                            const canvas = document.createElement('canvas');
-                            const ctx = canvas.getContext('2d');
-                            
-                            let scale = 1;
-                            if (quality === 'low' && Math.max(img.width, img.height) > 1200) {
-                                scale = 1200 / Math.max(img.width, img.height);
-                            } else if (quality === 'medium' && Math.max(img.width, img.height) > 2000) {
-                                scale = 2000 / Math.max(img.width, img.height);
-                            }
-                            
-                            canvas.width = img.width * scale;
-                            canvas.height = img.height * scale;
-                            
-                            ctx.fillStyle = '#ffffff';
-                            ctx.fillRect(0, 0, canvas.width, canvas.height);
-                            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-                            
-                            const jpegQuality = quality === 'low' ? 0.6 : 0.85;
-                            resolve(canvas.toDataURL('image/jpeg', jpegQuality));
-                        };
-                        img.onerror = reject;
-                        img.src = e.target.result;
-                    };
-                    reader.onerror = reject;
-                    reader.readAsDataURL(file);
-                });
-            }
-
-            // 取得最終準備匯出的影像
-            async function getFinalImageDataUrl(pageObj, quality) {
-                const fileData = filesData[pageObj.fileId];
-                let baseDataUrl = '';
-                
-                if (quality === 'high' && fileData.type === 'application/pdf') {
-                    const freshBuffer = await fileData.file.arrayBuffer();
-                    const loadingTask = pdfjsLib.getDocument({ data: new Uint8Array(freshBuffer) });
-                    const pdfDocument = await loadingTask.promise;
-                    const page = await pdfDocument.getPage(pageObj.originalPageIndex + 1);
-                    
-                    const viewport = page.getViewport({ scale: 2.5 }); 
-                    const canvas = document.createElement('canvas');
-                    const context = canvas.getContext('2d');
-                    canvas.height = viewport.height;
-                    canvas.width = viewport.width;
-                    
-                    context.fillStyle = '#ffffff';
-                    context.fillRect(0, 0, canvas.width, canvas.height);
-                    
-                    await page.render({ canvasContext: context, viewport: viewport }).promise;
-                    baseDataUrl = canvas.toDataURL('image/png');
-                }
-                else if (quality === 'low') {
-                     baseDataUrl = await new Promise((resolve) => {
-                        const img = new Image();
-                        img.onload = () => {
-                            const canvas = document.createElement('canvas');
-                            const ctx = canvas.getContext('2d');
-                            canvas.width = img.width * 0.7;
-                            canvas.height = img.height * 0.7;
-                            ctx.fillStyle = '#ffffff';
-                            ctx.fillRect(0, 0, canvas.width, canvas.height);
-                            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-                            resolve(canvas.toDataURL('image/jpeg', 0.5));
-                        };
-                        img.src = pageObj.originalThumbnailUrl;
-                     });
+                // 更新當前卡片樣式
+                if (pageObj.selected) {
+                  card.classList.add("selected", "border-red-500");
+                  card.classList.remove("border-gray-200");
                 } else {
-                     baseDataUrl = pageObj.originalThumbnailUrl; 
+                  card.classList.remove("selected", "border-red-500");
+                  card.classList.add("border-gray-200");
                 }
+                updateToolbar();
+              }
+            });
+
+            pagesGrid.appendChild(card);
+          });
+
+          updateToolbar();
+        }
+
+        // 初始化或更新 SortableJS
+        function initSortable() {
+          if (sortableInstance) {
+            sortableInstance.destroy();
+          }
+          sortableInstance = new Sortable(pagesGrid, {
+            animation: 150,
+            ghostClass: "sortable-ghost",
+            dragClass: "sortable-drag",
+            filter: ".page-checkbox, .absolute",
+            preventOnFilter: false,
+            onEnd: function (evt) {
+              const movedItem = pagesArray.splice(evt.oldIndex, 1)[0];
+              pagesArray.splice(evt.newIndex, 0, movedItem);
+              lastClickedIndex = -1; // 位置變更後重置多選錨點
+              renderPagesGrid();
+            },
+          });
+        }
+
+        // 更新工具列狀態
+        function updateToolbar() {
+          const totalPages = pagesArray.length;
+          const selectedPages = pagesArray.filter((p) => p.selected);
+          selectionCount.textContent = `已選擇 ${selectedPages.length} 頁`;
+
+          const hasSelection = selectedPages.length > 0;
+          const hasPages = totalPages > 0;
+
+          // 匯出與旋轉，需有勾選才能用
+          exportPdfBtn.disabled = !hasSelection;
+          exportPngBtn.disabled = !hasSelection;
+          exportMdBtn.disabled = !hasSelection;
+          rotateBtn.disabled = !hasSelection;
+
+          // 範圍選取，只要有檔案存在就能用
+          rangeStartInput.disabled = !hasPages;
+          rangeEndInput.disabled = !hasPages;
+          applyRangeBtn.disabled = !hasPages;
+
+          if (hasPages) {
+            rangeStartInput.max = totalPages;
+            rangeEndInput.max = totalPages;
+          }
+        }
+
+        function toggleAll(isSelect) {
+          pagesArray.forEach((p) => (p.selected = isSelect));
+          lastClickedIndex = -1;
+          renderPagesGrid();
+        }
+
+        // 畫布影像旋轉輔助函式
+        async function getRotatedDataUrl(
+          base64,
+          degrees,
+          mimeType = "image/jpeg",
+          quality = 0.8,
+        ) {
+          if (degrees === 0) return base64;
+          return new Promise((resolve) => {
+            const img = new Image();
+            img.onload = () => {
+              const canvas = document.createElement("canvas");
+              const ctx = canvas.getContext("2d");
+
+              if (degrees === 90 || degrees === 270) {
+                canvas.width = img.height;
+                canvas.height = img.width;
+              } else {
+                canvas.width = img.width;
+                canvas.height = img.height;
+              }
+
+              ctx.fillStyle = "#ffffff";
+              ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+              ctx.translate(canvas.width / 2, canvas.height / 2);
+              ctx.rotate((degrees * Math.PI) / 180);
+              ctx.drawImage(img, -img.width / 2, -img.height / 2);
+
+              resolve(canvas.toDataURL(mimeType, quality));
+            };
+            img.src = base64;
+          });
+        }
+
+        // 批次旋轉選擇的頁面
+        async function rotateSelectedPages() {
+          const selectedPages = pagesArray.filter((p) => p.selected);
+          if (selectedPages.length === 0) return;
+
+          showLoading("旋轉頁面中", "正在重新產生預覽圖...");
+
+          try {
+            for (let p of selectedPages) {
+              p.rotation = (p.rotation + 90) % 360;
+              p.dataUrl = await getRotatedDataUrl(
+                p.originalThumbnailUrl,
+                p.rotation,
+              );
+            }
+            renderPagesGrid();
+          } catch (error) {
+            console.error("旋轉處理失敗:", error);
+          } finally {
+            hideLoading();
+          }
+        }
+
+        // --- 匯出功能 ---
+
+        // 匯出為 PDF
+        async function exportAsPDF() {
+          const selectedPages = pagesArray.filter((p) => p.selected);
+          if (selectedPages.length === 0) return;
+
+          showLoading("組合 PDF 中", "正在處理並打包您的文件...");
+
+          try {
+            const quality = document.getElementById("qualitySelect").value;
+            const { PDFDocument, degrees } = PDFLib;
+            const mergedPdf = await PDFDocument.create();
+
+            const pdfPagesToCopy = {};
+            selectedPages.forEach((p) => {
+              const fileData = filesData[p.fileId];
+              if (fileData.type === "application/pdf") {
+                if (!pdfPagesToCopy[p.fileId])
+                  pdfPagesToCopy[p.fileId] = new Set();
+                pdfPagesToCopy[p.fileId].add(p.originalPageIndex);
+              }
+            });
+
+            const copiedPagesCache = {};
+
+            for (const fileId of Object.keys(pdfPagesToCopy)) {
+              const fileData = filesData[fileId];
+              const freshBuffer = await fileData.file.arrayBuffer();
+              const sourceDoc = await PDFDocument.load(freshBuffer, {
+                ignoreEncryption: true,
+              });
+
+              const indicesArray = Array.from(pdfPagesToCopy[fileId]);
+              const copiedPages = await mergedPdf.copyPages(
+                sourceDoc,
+                indicesArray,
+              );
+
+              copiedPagesCache[fileId] = {};
+              indicesArray.forEach((origIdx, i) => {
+                copiedPagesCache[fileId][origIdx] = copiedPages[i];
+              });
+            }
+
+            for (const pageObj of selectedPages) {
+              const fileData = filesData[pageObj.fileId];
+
+              if (fileData.type.startsWith("image/")) {
+                let image;
+                if (quality === "high" && fileData.type === "image/png") {
+                  const freshBuffer = await fileData.file.arrayBuffer();
+                  image = await mergedPdf.embedPng(freshBuffer);
+                } else if (quality === "high") {
+                  const freshBuffer = await fileData.file.arrayBuffer();
+                  image = await mergedPdf.embedJpg(freshBuffer);
+                } else {
+                  const compressedDataUrl = await compressImageFile(
+                    fileData.file,
+                    quality,
+                  );
+                  const base64Data = compressedDataUrl.split(",")[1];
+                  image = await mergedPdf.embedJpg(base64Data);
+                }
+
+                const { width, height } = image.scale(1);
+
+                if (pageObj.rotation === 90 || pageObj.rotation === 270) {
+                  const page = mergedPdf.addPage([height, width]);
+                  page.setSize(width, height);
+                  page.drawImage(image, { x: 0, y: 0, width, height });
+                  page.setRotation(degrees(pageObj.rotation));
+                } else {
+                  const page = mergedPdf.addPage([width, height]);
+                  page.drawImage(image, { x: 0, y: 0, width, height });
+                  if (pageObj.rotation === 180) {
+                    page.setRotation(degrees(pageObj.rotation));
+                  }
+                }
+              } else {
+                const pageToInsert =
+                  copiedPagesCache[pageObj.fileId][pageObj.originalPageIndex];
+                mergedPdf.addPage(pageToInsert);
 
                 if (pageObj.rotation) {
-                    const ext = quality === 'high' ? 'image/png' : 'image/jpeg';
-                    const qVal = quality === 'high' ? 1 : (quality === 'low' ? 0.6 : 0.85);
-                    baseDataUrl = await getRotatedDataUrl(baseDataUrl, pageObj.rotation, ext, qVal);
+                  const currentRotation = pageToInsert.getRotation().angle || 0;
+                  pageToInsert.setRotation(
+                    degrees((currentRotation + pageObj.rotation) % 360),
+                  );
+                }
+              }
+            }
+
+            const pdfBytes = await mergedPdf.save();
+            downloadFile(pdfBytes, "MixMatch_Document.pdf", "application/pdf");
+          } catch (error) {
+            console.error("匯出 PDF 失敗:", error);
+            alert("組合 PDF 時發生錯誤：\n" + (error.message || "未知的錯誤"));
+          } finally {
+            hideLoading();
+          }
+        }
+
+        // 匯出為圖片 ZIP
+        async function exportAsPNG() {
+          const selectedPages = pagesArray.filter((p) => p.selected);
+          if (selectedPages.length === 0) return;
+
+          showLoading("準備圖片中", "正在準備您的圖片檔案...");
+
+          try {
+            const quality = document.getElementById("qualitySelect").value;
+            const ext = quality === "high" ? "png" : "jpg";
+
+            if (selectedPages.length === 1) {
+              const finalDataUrl = await getFinalImageDataUrl(
+                selectedPages[0],
+                quality,
+              );
+              downloadURI(finalDataUrl, `MixMatch_Slide_1.${ext}`);
+            } else {
+              const zip = new JSZip();
+              const imgFolder = zip.folder("MixMatch_Slides");
+
+              for (let index = 0; index < selectedPages.length; index++) {
+                updateLoadingText(
+                  "打包圖片中",
+                  `正在處理圖片 (${index + 1}/${selectedPages.length})...`,
+                );
+                const finalDataUrl = await getFinalImageDataUrl(
+                  selectedPages[index],
+                  quality,
+                );
+                const base64Data = finalDataUrl.split(",")[1];
+                imgFolder.file(
+                  `Slide_${String(index + 1).padStart(3, "0")}.${ext}`,
+                  base64Data,
+                  { base64: true },
+                );
+              }
+
+              updateLoadingText("打包圖片中", "正在產生 ZIP 壓縮檔...");
+              const zipBlob = await zip.generateAsync({ type: "blob" });
+              const url = URL.createObjectURL(zipBlob);
+              downloadURI(url, "MixMatch_Slides.zip");
+              URL.revokeObjectURL(url);
+            }
+          } catch (error) {
+            console.error("匯出圖片失敗:", error);
+            alert("匯出圖片時發生錯誤。");
+          } finally {
+            hideLoading();
+          }
+        }
+
+        // 壓縮與圖片處理
+        async function compressImageFile(file, quality) {
+          return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+              const img = new Image();
+              img.onload = () => {
+                const canvas = document.createElement("canvas");
+                const ctx = canvas.getContext("2d");
+
+                let scale = 1;
+                if (
+                  quality === "low" &&
+                  Math.max(img.width, img.height) > 1200
+                ) {
+                  scale = 1200 / Math.max(img.width, img.height);
+                } else if (
+                  quality === "medium" &&
+                  Math.max(img.width, img.height) > 2000
+                ) {
+                  scale = 2000 / Math.max(img.width, img.height);
                 }
 
-                return baseDataUrl; 
+                canvas.width = img.width * scale;
+                canvas.height = img.height * scale;
+
+                ctx.fillStyle = "#ffffff";
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+                const jpegQuality = quality === "low" ? 0.6 : 0.85;
+                resolve(canvas.toDataURL("image/jpeg", jpegQuality));
+              };
+              img.onerror = reject;
+              img.src = e.target.result;
+            };
+            reader.onerror = reject;
+            reader.readAsDataURL(file);
+          });
+        }
+
+        // 取得最終準備匯出的影像
+        async function getFinalImageDataUrl(pageObj, quality) {
+          const fileData = filesData[pageObj.fileId];
+          let baseDataUrl = "";
+
+          if (quality === "high" && fileData.type === "application/pdf") {
+            const freshBuffer = await fileData.file.arrayBuffer();
+            const loadingTask = pdfjsLib.getDocument({
+              data: new Uint8Array(freshBuffer),
+            });
+            const pdfDocument = await loadingTask.promise;
+            const page = await pdfDocument.getPage(
+              pageObj.originalPageIndex + 1,
+            );
+
+            const viewport = page.getViewport({ scale: 2.5 });
+            const canvas = document.createElement("canvas");
+            const context = canvas.getContext("2d");
+            canvas.height = viewport.height;
+            canvas.width = viewport.width;
+
+            context.fillStyle = "#ffffff";
+            context.fillRect(0, 0, canvas.width, canvas.height);
+
+            await page.render({ canvasContext: context, viewport: viewport })
+              .promise;
+            baseDataUrl = canvas.toDataURL("image/png");
+          } else if (quality === "low") {
+            baseDataUrl = await new Promise((resolve) => {
+              const img = new Image();
+              img.onload = () => {
+                const canvas = document.createElement("canvas");
+                const ctx = canvas.getContext("2d");
+                canvas.width = img.width * 0.7;
+                canvas.height = img.height * 0.7;
+                ctx.fillStyle = "#ffffff";
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                resolve(canvas.toDataURL("image/jpeg", 0.5));
+              };
+              img.src = pageObj.originalThumbnailUrl;
+            });
+          } else {
+            baseDataUrl = pageObj.originalThumbnailUrl;
+          }
+
+          if (pageObj.rotation) {
+            const ext = quality === "high" ? "image/png" : "image/jpeg";
+            const qVal =
+              quality === "high" ? 1 : quality === "low" ? 0.6 : 0.85;
+            baseDataUrl = await getRotatedDataUrl(
+              baseDataUrl,
+              pageObj.rotation,
+              ext,
+              qVal,
+            );
+          }
+
+          return baseDataUrl;
+        }
+
+        // 匯出為 Markdown (.md)
+        async function exportAsMarkdown() {
+          const selectedPages = pagesArray.filter((p) => p.selected);
+          if (selectedPages.length === 0) return;
+
+          showLoading("擷取文字中", "正在掃描頁面並轉換為 Markdown...");
+
+          try {
+            let markdownContent = "# PDF Mix & Match - 文件輸出\n\n";
+            const quality = document.getElementById("qualitySelect").value;
+
+            for (let i = 0; i < selectedPages.length; i++) {
+              const pageObj = selectedPages[i];
+              const fileData = filesData[pageObj.fileId];
+
+              updateLoadingText(
+                "擷取文字中",
+                `正在處理第 ${i + 1} / ${selectedPages.length} 頁...`,
+              );
+
+              markdownContent += `## 第 ${i + 1} 頁 (${fileData.name})\n\n`;
+
+              if (fileData.type === "application/pdf") {
+                const freshBuffer = await fileData.file.arrayBuffer();
+                const loadingTask = pdfjsLib.getDocument({
+                  data: new Uint8Array(freshBuffer),
+                });
+                const pdfDocument = await loadingTask.promise;
+                const page = await pdfDocument.getPage(
+                  pageObj.originalPageIndex + 1,
+                );
+
+                const textContent = await page.getTextContent();
+                let pageText = "";
+                let lastY = -1;
+
+                textContent.items.forEach((item) => {
+                  if (lastY !== -1 && Math.abs(lastY - item.transform[5]) > 5) {
+                    pageText += "\n";
+                  }
+                  pageText += item.str;
+                  lastY = item.transform[5];
+                });
+
+                if (pageText.trim()) {
+                  markdownContent += pageText + "\n\n";
+                } else {
+                  markdownContent +=
+                    "> *此頁無可擷取的數位文字（可能是全影像掃描檔）。*\n\n";
+                }
+              } else {
+                const finalDataUrl = await getFinalImageDataUrl(
+                  pageObj,
+                  quality,
+                );
+                markdownContent += `![插入的圖片](${finalDataUrl})\n\n`;
+              }
+
+              markdownContent += "---\n\n";
             }
 
-            // --- UI 輔助函式 ---
-            function showLoading(title, desc) {
-                loadingTitle.textContent = title;
-                loadingDesc.textContent = desc;
-                loadingOverlay.classList.remove('hidden');
-                loadingOverlay.classList.add('flex');
-            }
+            const utf8BOM = "\uFEFF";
+            const blob = new Blob([utf8BOM + markdownContent], {
+              type: "text/markdown;charset=utf-8",
+            });
+            const url = URL.createObjectURL(blob);
+            downloadURI(url, "MixMatch_Document.md");
+            URL.revokeObjectURL(url);
+          } catch (error) {
+            console.error("匯出 Markdown 失敗:", error);
+            alert(
+              "轉換 Markdown 時發生錯誤：\n" + (error.message || "未知的錯誤"),
+            );
+          } finally {
+            hideLoading();
+          }
+        }
 
-            function updateLoadingText(title, desc) {
-                loadingTitle.textContent = title;
-                loadingDesc.textContent = desc;
-            }
+        // --- UI 輔助函式 ---
+        function showLoading(title, desc) {
+          loadingTitle.textContent = title;
+          loadingDesc.textContent = desc;
+          loadingOverlay.classList.remove("hidden");
+          loadingOverlay.classList.add("flex");
+        }
 
-            function hideLoading() {
-                loadingOverlay.classList.add('hidden');
-                loadingOverlay.classList.remove('flex');
-            }
+        function updateLoadingText(title, desc) {
+          loadingTitle.textContent = title;
+          loadingDesc.textContent = desc;
+        }
 
-            function downloadFile(bytes, filename, mimeType) {
-                const blob = new Blob([bytes], { type: mimeType });
-                const url = URL.createObjectURL(blob);
-                downloadURI(url, filename);
-                URL.revokeObjectURL(url);
-            }
+        function hideLoading() {
+          loadingOverlay.classList.add("hidden");
+          loadingOverlay.classList.remove("flex");
+        }
 
-            function downloadURI(uri, name) {
-                const link = document.createElement("a");
-                link.download = name;
-                link.href = uri;
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
-            }
-        });
+        function downloadFile(bytes, filename, mimeType) {
+          const blob = new Blob([bytes], { type: mimeType });
+          const url = URL.createObjectURL(blob);
+          downloadURI(url, filename);
+          URL.revokeObjectURL(url);
+        }
+
+        function downloadURI(uri, name) {
+          const link = document.createElement("a");
+          link.download = name;
+          link.href = uri;
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+        }
+      });
     </script>
-</body>
+  </body>
 </html>
