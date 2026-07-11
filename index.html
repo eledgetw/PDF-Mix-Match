@@ -107,10 +107,10 @@
 
     <!-- 操作工具列 -->
     <div
-      class="bg-white border-b border-gray-200 shadow-sm z-10 flex-shrink-0 overflow-x-auto no-scrollbar"
+      class="bg-white border-b border-gray-200 shadow-sm z-10 flex-shrink-0"
     >
       <div
-        class="max-w-7xl mx-auto px-4 py-3 flex flex-col xl:flex-row justify-between items-center gap-3 min-w-max"
+        class="max-w-7xl mx-auto px-4 py-3 flex flex-col xl:flex-row justify-between items-center gap-3 flex-wrap"
       >
         <div class="flex flex-wrap items-center gap-3 w-full xl:w-auto">
           <button
@@ -183,14 +183,31 @@
           </button>
 
           <span class="text-sm text-gray-300">|</span>
+
+          <div class="flex items-center gap-1 bg-slate-50 p-1 rounded border border-gray-100">
+            <input
+              type="text"
+              id="renameSuffix"
+              class="w-20 h-7 px-1 text-sm border border-gray-300 rounded focus:ring-red-500 focus:border-red-500 text-center"
+              placeholder="自訂名稱"
+            />
+            <button
+              id="batchRenameBtn"
+              class="px-2 py-1 text-xs font-bold bg-slate-200 hover:bg-slate-300 text-slate-700 rounded transition shadow-sm whitespace-nowrap"
+            >
+              一鍵命名
+            </button>
+          </div>
+
+          <span class="text-sm text-gray-300">|</span>
           <span
             id="selectionCount"
-            class="text-sm font-bold text-red-600 bg-red-50 px-3 py-1 rounded-full"
+            class="text-sm font-bold text-red-600 bg-red-50 px-3 py-1 rounded-full whitespace-nowrap"
             >已選擇 0 頁</span
           >
         </div>
 
-        <div class="flex items-center gap-3 w-full xl:w-auto mt-2 xl:mt-0">
+        <div class="flex flex-wrap items-center gap-3 w-full xl:w-auto mt-2 xl:mt-0">
           <!-- 壓縮選項 -->
           <select
             id="qualitySelect"
@@ -298,6 +315,9 @@
         const rangeEndInput = document.getElementById("rangeEnd");
         const applyRangeBtn = document.getElementById("applyRangeBtn");
 
+        const renameSuffixInput = document.getElementById("renameSuffix");
+        const batchRenameBtn = document.getElementById("batchRenameBtn");
+
         const loadingOverlay = document.getElementById("loadingOverlay");
         const loadingTitle = document.getElementById("loadingTitle");
         const loadingDesc = document.getElementById("loadingDesc");
@@ -319,6 +339,16 @@
         rotateBtn.addEventListener("click", rotateSelectedPages);
         docEnhanceBtn.addEventListener("click", enhanceSelectedPages);
         applyRangeBtn.addEventListener("click", applyRangeSelection); // 綁定套用範圍按鈕
+
+        batchRenameBtn.addEventListener("click", () => {
+          if (pagesArray.length === 0) return;
+          const suffix = renameSuffixInput.value.trim();
+          pagesArray.forEach((pageObj, index) => {
+            const num = String(index + 1).padStart(3, "0");
+            pageObj.customName = suffix ? `${num}_${suffix}` : num;
+          });
+          renderPagesGrid();
+        });
 
         fileInput.addEventListener("change", (e) => {
           if (e.target.files.length > 0) processUploadedFiles(e.target.files);
@@ -549,7 +579,7 @@
                         
                         <!-- 底部資訊列 -->
                         <div class="bg-slate-50 border-t border-gray-200 px-3 py-2 flex justify-between items-center text-xs text-slate-500 font-medium">
-                            <span class="truncate pr-2" title="${filesData[pageObj.fileId].name}">${filesData[pageObj.fileId].name}</span>
+                            <span class="truncate pr-2" title="${pageObj.customName || filesData[pageObj.fileId].name}">${pageObj.customName || filesData[pageObj.fileId].name}</span>
                             <span class="bg-slate-200 text-slate-700 px-2 py-0.5 rounded-full flex-shrink-0">
                                 ${pageObj.displayNumber === "圖" ? '<i class="fa-regular fa-image"></i>' : "P." + pageObj.displayNumber}
                             </span>
@@ -894,7 +924,8 @@
                 selectedPages[0],
                 quality,
               );
-              downloadURI(finalDataUrl, `MixMatch_Slide_1.${ext}`);
+              const fileName = selectedPages[0].customName ? `${selectedPages[0].customName}.${ext}` : `MixMatch_Slide_1.${ext}`;
+              downloadURI(finalDataUrl, fileName);
             } else {
               const zip = new JSZip();
               const imgFolder = zip.folder("MixMatch_Slides");
@@ -909,11 +940,10 @@
                   quality,
                 );
                 const base64Data = finalDataUrl.split(",")[1];
-                imgFolder.file(
-                  `Slide_${String(index + 1).padStart(3, "0")}.${ext}`,
-                  base64Data,
-                  { base64: true },
-                );
+                const fileName = selectedPages[index].customName 
+                  ? `${selectedPages[index].customName}.${ext}` 
+                  : `Slide_${String(index + 1).padStart(3, "0")}.${ext}`;
+                imgFolder.file(fileName, base64Data, { base64: true });
               }
 
               updateLoadingText("打包圖片中", "正在產生 ZIP 壓縮檔...");
@@ -1052,7 +1082,8 @@
                 `正在處理第 ${i + 1} / ${selectedPages.length} 頁...`,
               );
 
-              markdownContent += `## 第 ${i + 1} 頁 (${fileData.name})\n\n`;
+              const displayName = pageObj.customName || fileData.name;
+              markdownContent += `## 第 ${i + 1} 頁 (${displayName})\n\n`;
 
               if (fileData.type === "application/pdf") {
                 const freshBuffer = await fileData.file.arrayBuffer();
